@@ -1,0 +1,12 @@
+# Ignore the Three.js experimental main file if not used
+main.js
+
+# Node modules (if using Node tools)
+node_modules/
+
+# Python cache
+__pycache__/
+
+# Ignore local editor files
+.vscode/
+.idea/
