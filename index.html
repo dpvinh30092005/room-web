@@ -17,7 +17,7 @@ canvas{width:100%;height:100%;}
 
 <script>
 const canvas = document.getElementById("renderCanvas");
-const engine = new BABYLON.Engine(canvas,true);
+const engine = new BABYLON.Engine(canvas, true);
 
 const createScene = ()=>{
   const scene = new BABYLON.Scene(engine);
@@ -30,12 +30,81 @@ const createScene = ()=>{
   new BABYLON.HemisphericLight("light",
       new BABYLON.Vector3(1,1,0), scene);
 
-  BABYLON.SceneLoader.Append("./", "base.glb", scene);
-
   return scene;
 }
 
 const scene = createScene();
+
+// Highlight layer for hover effect
+const hl = new BABYLON.HighlightLayer("hl", scene);
+let lastHovered = null;
+
+BABYLON.SceneLoader.Append("./", "base.glb", scene, function (sceneLoaded) {
+  // make meshes pickable and set simple materials if needed
+  sceneLoaded.meshes.forEach(mesh => {
+    if (mesh.material) {
+      // ensure each mesh has its own material instance to allow per-mesh color
+      try { mesh.material = mesh.material.clone(mesh.name + "_mat"); } catch(e){}
+    } else {
+      const m = new BABYLON.StandardMaterial(mesh.name + "_mat", scene);
+      m.diffuseColor = new BABYLON.Color3(0.8,0.8,0.8);
+      mesh.material = m;
+    }
+    mesh.isPickable = true;
+  });
+
+  // pointer move: hover
+  scene.onPointerObservable.add((pointerInfo) => {
+    switch (pointerInfo.type) {
+      case BABYLON.PointerEventTypes.POINTERMOVE:
+        const pickInfo = scene.pick(scene.pointerX, scene.pointerY, (m) => m.isPickable);
+        if (pickInfo.hit && pickInfo.pickedMesh) {
+          const m = pickInfo.pickedMesh;
+          if (lastHovered !== m) {
+            if (lastHovered) hl.removeMesh(lastHovered);
+            hl.addMesh(m, BABYLON.Color3.FromHexString("#66b3ff"));
+            lastHovered = m;
+            document.body.style.cursor = 'pointer';
+          }
+        } else {
+          if (lastHovered) {
+            hl.removeMesh(lastHovered);
+            lastHovered = null;
+            document.body.style.cursor = 'default';
+          }
+        }
+        break;
+      case BABYLON.PointerEventTypes.POINTERDOWN:
+        const p = scene.pick(scene.pointerX, scene.pointerY, (m) => m.isPickable);
+        if (p.hit && p.pickedMesh) {
+          const picked = p.pickedMesh;
+          // rotate
+          picked.rotate(BABYLON.Axis.Y, Math.PI/4, BABYLON.Space.LOCAL);
+
+          // assign random color
+          const hex = randomHexColor();
+          if (picked.material) {
+            if (picked.material.albedoColor) {
+              picked.material.albedoColor = BABYLON.Color3.FromHexString(hex);
+            } else if (picked.material.diffuseColor) {
+              picked.material.diffuseColor = BABYLON.Color3.FromHexString(hex);
+            } else if (picked.material.baseColor) {
+              picked.material.baseColor = BABYLON.Color3.FromHexString(hex);
+            }
+          }
+        }
+        break;
+    }
+  });
+
+});
+
+function randomHexColor(){
+  const r = Math.floor(Math.random()*256).toString(16).padStart(2,'0');
+  const g = Math.floor(Math.random()*256).toString(16).padStart(2,'0');
+  const b = Math.floor(Math.random()*256).toString(16).padStart(2,'0');
+  return `#${r}${g}${b}`;
+}
 
 engine.runRenderLoop(()=>scene.render());
 window.addEventListener("resize",()=>engine.resize());
